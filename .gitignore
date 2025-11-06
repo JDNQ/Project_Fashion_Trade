@@ -25,3 +25,12 @@ hs_err_pid*
 .classpath
 .project
 .settings/
+# ==================================
+# FRONTEND (React) IGNORES
+# Thêm các dòng này để bỏ qua node_modules và build
+# ==================================
+/fashion-admin-ui/node_modules
+/fashion-admin-ui/build
+/fashion-admin-ui/.pnp
+/fashion-admin-ui/.pnp.js
+/fashion-admin-ui/.env.local
