@@ -1,5 +1,8 @@
 package com.example.fashion.controller;
 
+// ===============================================
+// ĐẢM BẢO BẠN CÓ ĐẦY ĐỦ CÁC DÒNG IMPORT NÀY
+// ===============================================
 import com.example.fashion.dto.ProductCreateRequestDTO;
 import com.example.fashion.dto.ProductResponseDTO;
 import com.example.fashion.dto.ProductUpdateRequestDTO;
@@ -13,7 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v1/admin/products")
+@RequestMapping("/api/v1/admin/products") // <-- Đảm bảo đường dẫn này chính xác
 public class AdminProductController {
 
     private final ProductService productService;
@@ -37,9 +40,9 @@ public class AdminProductController {
 
     /**
      * API Lấy danh sách sản phẩm (READ - LIST)
-     * Hỗ trợ phân trang: ?page=0&size=10&sort=name,asc
+     * (Đây là API đang bị lỗi 404)
      */
-    @GetMapping
+    @GetMapping // <-- Đảm bảo bạn có @GetMapping
     public ResponseEntity<Page<ProductResponseDTO>> getAllProducts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -88,7 +91,6 @@ public class AdminProductController {
     public ResponseEntity<?> deleteProduct(@PathVariable Long id) {
         try {
             productService.deleteProduct(id);
-            // Trả về 204 No Content (Không có nội dung) khi xóa thành công
             return ResponseEntity.noContent().build();
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
