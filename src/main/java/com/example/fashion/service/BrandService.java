@@ -69,4 +69,9 @@ public class BrandService {
 
         brandRepository.delete(brand);
     }
+    public BrandResponseDTO getBrandById(Long brandId) {
+        Brand brand = brandRepository.findById(brandId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy Brand ID: " + brandId));
+        return BrandResponseDTO.fromBrand(brand);
+    }
 }

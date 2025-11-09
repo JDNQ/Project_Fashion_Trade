@@ -1,11 +1,12 @@
 import axios from 'axios';
 
-// Định nghĩa URL cơ sở của API
+// 1. Đảm bảo cổng (port) này khớp với backend của bạn (8080 hoặc 8083)
 const API_BASE_URL = 'http://localhost:8080/api/v1';
 
 /**
- * Tạo một "instance" của axios với cấu hình chung
- * (Chúng ta sẽ dùng cái này thay vì axios global để tránh xung đột)
+ * Tạo một "instance" của axios
+ * (Chúng ta dùng apiClient riêng cho Auth để không bị xung đột
+ * với 'axios.defaults' mà AuthContext quản lý)
  */
 const apiClient = axios.create({
     baseURL: API_BASE_URL,
@@ -14,31 +15,21 @@ const apiClient = axios.create({
     }
 });
 
-/**
- * Dịch vụ xử lý logic đăng nhập
- * Đây là một đối tượng (Object)
- */
 const AuthService = {
 
     /**
-     * Gọi API đăng nhập
+     * API Đăng nhập
      */
     login: async (email, password) => {
         try {
-            // 1. Gọi API /auth/login
             const response = await apiClient.post('/auth/login', {
                 email: email,
                 password: password
             });
 
-            // 2. Nếu gọi thành công (status 200)
             if (response.data && response.data.accessToken) {
                 const token = response.data.accessToken;
-
-                // 3. Lưu token vào localStorage
                 localStorage.setItem('admin_token', token);
-
-                // 4. Trả về token
                 return token;
             } else {
                 throw new Error('Phản hồi không hợp lệ từ máy chủ');
@@ -49,9 +40,26 @@ const AuthService = {
         }
     },
 
+    // ========== 2. THÊM HÀM MỚI ==========
+    /**
+     * API Đăng ký Khách hàng
+     * @param {object} registerData (chứa fullName, email, password, phone)
+     */
+    register: async (registerData) => {
+        try {
+            // Gọi API /register mới
+            const response = await apiClient.post('/auth/register', registerData);
+            return response.data; // Trả về thông báo thành công
+        } catch (error) {
+            console.error('Lỗi đăng ký:', error.response?.data || error.message);
+            // Ném lỗi (ví dụ: "Email đã được sử dụng")
+            throw new Error(error.response?.data || 'Đăng ký thất bại');
+        }
+    },
+    // ===================================
+
     /**
      * Lấy token từ localStorage
-     * (Đây là hàm mà AuthContext đang gọi)
      */
     getToken: () => {
         return localStorage.getItem('admin_token');
@@ -65,5 +73,4 @@ const AuthService = {
     }
 };
 
-// Đảm bảo bạn export default ĐỐI TƯỢNG 'AuthService'
 export default AuthService;

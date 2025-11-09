@@ -1,16 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import BrandService from '../../services/BrandService';
+import {
+    Table,
+    Button,
+    Space,
+    Typography,
+    Popconfirm,
+    notification
+} from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 
-// (Styles - Tương tự các trang List khác)
-const tableStyle = { width: '100%', borderCollapse: 'collapse', marginTop: '20px' };
-const thTdStyle = { border: '1px solid #ddd', padding: '8px', textAlign: 'left' };
-const thStyle = { ...thTdStyle, backgroundColor: '#f2f2f2' };
-const errorStyle = { color: 'red' };
-const buttonStyle = { margin: '0 5px', padding: '5px 10px', cursor: 'pointer', textDecoration: 'none' };
-const addButtonStyle = { display: 'inline-block', padding: '10px 15px', backgroundColor: '#28a745', color: 'white', textDecoration: 'none', borderRadius: '5px', marginBottom: '20px' };
+const { Title } = Typography;
 
 function BrandListPage() {
+    const navigate = useNavigate();
     const [brands, setBrands] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -24,6 +28,7 @@ function BrandListPage() {
             setBrands(data);
         } catch (err) {
             setError(err.message);
+            notification.error({ message: 'Lỗi tải thương hiệu', description: err.message });
         } finally {
             setLoading(false);
         }
@@ -36,62 +41,88 @@ function BrandListPage() {
 
     // 3. Hàm xử lý Xóa
     const handleDelete = async (id) => {
-        if (window.confirm(`Bạn có chắc muốn xóa thương hiệu ID: ${id}?`)) {
-            try {
-                await BrandService.deleteBrand(id);
-                alert('Xóa thương hiệu thành công.');
-                fetchBrands(); // Tải lại danh sách
-            } catch (err) {
-                alert('Lỗi khi xóa thương hiệu: ' + err.message);
-            }
+        try {
+            await BrandService.deleteBrand(id);
+            notification.success({ message: 'Xóa thương hiệu thành công.' });
+            fetchBrands(); // Tải lại danh sách
+        } catch (err) {
+            notification.error({ message: 'Lỗi khi xóa thương hiệu', description: err.message });
         }
     };
 
-    // 4. Render
-    if (loading) return <p>Đang tải thương hiệu...</p>;
-    if (error) return <p style={errorStyle}>Lỗi: {error}</p>;
+    // 4. Định nghĩa các cột (columns) cho Table
+    const columns = [
+        {
+            title: 'ID',
+            dataIndex: 'id',
+            key: 'id',
+            sorter: (a, b) => a.id - b.id,
+        },
+        {
+            title: 'Tên',
+            dataIndex: 'name',
+            key: 'name',
+        },
+        {
+            title: 'Slug',
+            dataIndex: 'slug',
+            key: 'slug',
+        },
+        {
+            title: 'Hành động',
+            key: 'action',
+            render: (text, record) => (
+                <Space size="middle">
+                    <Button
+                        type="primary"
+                        icon={<EditOutlined />}
+                        onClick={() => navigate(`/admin/brands/edit/${record.id}`)}
+                    >
+                        Sửa
+                    </Button>
+                    <Popconfirm
+                        title="Xóa thương hiệu?"
+                        description="Bạn có chắc muốn xóa thương hiệu này?"
+                        onConfirm={() => handleDelete(record.id)}
+                        okText="Đồng ý"
+                        cancelText="Hủy"
+                    >
+                        <Button type="primary" danger icon={<DeleteOutlined />}>
+                            Xóa
+                        </Button>
+                    </Popconfirm>
+                </Space>
+            ),
+        },
+    ];
 
+    // 5. Render
     return (
         <div>
-            <h2>Quản lý Thương hiệu</h2>
+            <Space direction="vertical" style={{ width: '100%' }}>
+                <Title level={2}>Quản lý Thương hiệu</Title>
 
-            <Link to="/admin/brands/new" style={addButtonStyle}>
-                + Thêm thương hiệu mới
-            </Link>
+                <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    style={{ marginBottom: 16 }}
+                    onClick={() => navigate('/admin/brands/new')}
+                >
+                    Thêm thương hiệu mới
+                </Button>
 
-            <table style={tableStyle}>
-                <thead>
-                    <tr>
-                        <th style={thStyle}>ID</th>
-                        <th style={thStyle}>Tên</th>
-                        <th style={thStyle}>Slug</th>
-                        <th style={thStyle}>Hành động</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {brands.map(brand => (
-                        <tr key={brand.id}>
-                            <td style={thTdStyle}>{brand.id}</td>
-                            <td style={thTdStyle}>{brand.name}</td>
-                            <td style={thTdStyle}>{brand.slug}</td>
-                            <td style={thTdStyle}>
-                                <Link
-                                    to={`/admin/brands/edit/${brand.id}`}
-                                    style={{...buttonStyle, backgroundColor: '#ffc107'}}
-                                >
-                                    Sửa
-                                </Link>
-                                <button
-                                    style={{...buttonStyle, backgroundColor: '#dc3545', color: 'white'}}
-                                    onClick={() => handleDelete(brand.id)}
-                                >
-                                    Xóa
-                                </button>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+                {error && <p style={{color: 'red'}}>Lỗi: {error}</p>}
+
+                <Table
+                    columns={columns}
+                    dataSource={brands}
+                    rowKey="id"
+                    pagination={{ pageSize: 10 }}
+                    loading={loading}
+                    bordered
+                    scroll={{ x: 'max-content' }}
+                />
+            </Space>
         </div>
     );
 }

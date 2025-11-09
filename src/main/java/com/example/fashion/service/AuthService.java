@@ -1,17 +1,16 @@
 package com.example.fashion.service;
 
-
-
+import com.example.fashion.dto.CustomerRegisterRequestDTO; // <-- 1. Import mới
 import com.example.fashion.dto.LoginRequest;
 import com.example.fashion.dto.RegisterAdminRequest;
 import com.example.fashion.entity.User;
 import com.example.fashion.enums.Role;
 import com.example.fashion.repository.UserRepository;
 import com.example.fashion.security.JwtTokenProvider;
-import org.springframework.security.authentication.AuthenticationManager; // <-- Import mới
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken; // <-- Import mới
-import org.springframework.security.core.Authentication; // <-- Import mới
-import org.springframework.security.core.context.SecurityContextHolder; // <-- Import mới
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -22,67 +21,82 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final AuthenticationManager authenticationManager; // <-- Thêm mới
-    private final JwtTokenProvider jwtTokenProvider; // <-- Thêm mới
+    private final AuthenticationManager authenticationManager;
+    private final JwtTokenProvider jwtTokenProvider;
 
-    // Cập nhật constructor
     public AuthService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
-                       AuthenticationManager authenticationManager, // <-- Thêm mới
-                       JwtTokenProvider jwtTokenProvider) { // <-- Thêm mới
+                       AuthenticationManager authenticationManager,
+                       JwtTokenProvider jwtTokenProvider) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
-        this.authenticationManager = authenticationManager; // <-- Thêm mới
-        this.jwtTokenProvider = jwtTokenProvider; // <-- Thêm mới
+        this.authenticationManager = authenticationManager;
+        this.jwtTokenProvider = jwtTokenProvider;
     }
 
     /**
      * Logic đăng nhập
-     * Trả về JWT nếu thành công
      */
     public String loginUser(LoginRequest loginRequest) {
-        // 1. Tạo đối tượng xác thực
+        // ... (Giữ nguyên code)
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         loginRequest.getEmail(),
                         loginRequest.getPassword()
                 )
         );
-
-        // 2. Nếu xác thực thành công, thiết lập cho SecurityContext
         SecurityContextHolder.getContext().setAuthentication(authentication);
-
-        // 3. Tạo JWT và trả về
         return jwtTokenProvider.generateToken(authentication);
     }
+
+
+    // ========== 2. THÊM HÀM MỚI ==========
+    /**
+     * Logic đăng ký cho Khách hàng (Customer)
+     */
+    public User registerCustomer(CustomerRegisterRequestDTO request) {
+        // 1. Kiểm tra email tồn tại
+        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+            throw new RuntimeException("Email đã được sử dụng");
+        }
+
+        // 2. Tạo User mới
+        User customer = new User();
+        customer.setEmail(request.getEmail());
+        customer.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        customer.setFullName(request.getFullName());
+        customer.setPhone(request.getPhone());
+
+        // 3. Gán vai trò CUSTOMER
+        customer.setRoles(Set.of(Role.CUSTOMER));
+
+        customer.setStatus("active");
+
+        // Yêu cầu 3.1: Cần xác thực email (chúng ta tạm thời bỏ qua bước gửi mail)
+        customer.setEmailVerified(false); // (Tạm thời đặt là false, khi nào làm
+        // chức năng xác thực mail thì đổi)
+
+        // 4. Lưu vào DB
+        return userRepository.save(customer);
+    }
+    // ===================================
 
 
     /**
      * Logic đăng ký tài khoản SUPER_ADMIN
      */
     public User registerSuperAdmin(RegisterAdminRequest request) {
-
-        // 1. Kiểm tra xem email đã tồn tại chưa
+        // ... (Giữ nguyên code)
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
             throw new RuntimeException("Email đã được sử dụng");
         }
-
-        // 2. Tạo đối tượng User mới
         User adminUser = new User();
         adminUser.setEmail(request.getEmail());
-
-        // 3. Mã hóa mật khẩu
         adminUser.setPasswordHash(passwordEncoder.encode(request.getPassword()));
-
         adminUser.setFullName(request.getFullName());
-
-        // 4. Gán vai trò SUPER_ADMIN
         adminUser.setRoles(Set.of(Role.SUPER_ADMIN));
-
         adminUser.setStatus("active");
         adminUser.setEmailVerified(true);
-
-        // 5. Lưu vào cơ sở dữ liệu
         return userRepository.save(adminUser);
     }
 }

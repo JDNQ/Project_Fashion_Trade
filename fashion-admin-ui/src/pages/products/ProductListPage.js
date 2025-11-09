@@ -1,35 +1,44 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import ProductService from '../../services/ProductService'; // Đã import
+import { Link, useNavigate } from 'react-router-dom';
+import ProductService from '../../services/ProductService';
+import { Table, Button, Space, Image, Tag, Typography, Popconfirm } from 'antd'; // Import component AntD
+import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'; // Import icons
 
-// Styles (Giữ nguyên)
-const tableStyle = { width: '100%', borderCollapse: 'collapse', marginTop: '20px' };
-const thTdStyle = { border: '1px solid #ddd', padding: '8px', textAlign: 'left' };
-const thStyle = { ...thTdStyle, backgroundColor: '#f2f2f2' };
-const errorStyle = { color: 'red' };
-const paginationStyle = { marginTop: '20px' };
-const buttonStyle = { margin: '0 5px', padding: '5px 10px', cursor: 'pointer', textDecoration: 'none' };
-const addButtonStyle = { display: 'inline-block', padding: '10px 15px', backgroundColor: '#28a745', color: 'white', textDecoration: 'none', borderRadius: '5px', marginBottom: '20px' };
+const { Title } = Typography;
 
 function ProductListPage() {
-    // ... (Toàn bộ State: products, currentPage, ... giữ nguyên) ...
+    const navigate = useNavigate();
+
+    // 1. State cho dữ liệu (dataSource của Table)
     const [products, setProducts] = useState([]);
-    const [currentPage, setCurrentPage] = useState(0);
-    const [totalPages, setTotalPages] = useState(0);
-    const [totalElements, setTotalElements] = useState(0);
+
+    // 2. State cho phân trang (Table tự quản lý)
+    const [pagination, setPagination] = useState({
+        current: 1, // AntD Table bắt đầu từ 1
+        pageSize: 10,
+        total: 0,
+    });
+
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // ... (Hàm fetchProducts, useEffect, handleNextPage, handlePrevPage giữ nguyên) ...
-    const fetchProducts = async (page) => {
+    // 3. Hàm fetch dữ liệu (Cập nhật cho AntD)
+    const fetchProducts = async (page = 1, pageSize = 10) => {
         try {
             setLoading(true);
             setError(null);
-            const data = await ProductService.getAllProducts(page, 10, "id,desc");
+
+            // Chuyển đổi (AntD page 1 = Spring Page 0)
+            const springPage = page - 1;
+            const data = await ProductService.getAllProducts(springPage, pageSize, "id,desc");
+
             setProducts(data.content);
-            setTotalPages(data.totalPages);
-            setTotalElements(data.totalElements);
-            setCurrentPage(data.number);
+            setPagination({
+                current: data.number + 1,
+                pageSize: data.size,
+                total: data.totalElements, // Tổng số phần tử
+            });
+
         } catch (err) {
             setError(err.message);
         } finally {
@@ -37,105 +46,117 @@ function ProductListPage() {
         }
     };
 
+    // 4. useEffect: Tải dữ liệu khi mount
     useEffect(() => {
-        fetchProducts(currentPage);
-    }, [currentPage]);
+        fetchProducts(pagination.current, pagination.pageSize);
+    }, []); // Chỉ tải 1 lần khi mount
 
-    const handleNextPage = () => {
-        if (currentPage < totalPages - 1) {
-            setCurrentPage(currentPage + 1);
-        }
-    };
-    const handlePrevPage = () => {
-        if (currentPage > 0) {
-            setCurrentPage(currentPage - 1);
-        }
+    // 5. Xử lý khi Table thay đổi (đổi trang, sắp xếp...)
+    const handleTableChange = (newPagination) => {
+        fetchProducts(newPagination.current, newPagination.pageSize);
     };
 
-    // ========== THÊM MỚI: HÀM XỬ LÝ XÓA ==========
-    const handleDeleteProduct = async (productId) => {
-        // 1. Xác nhận
-        if (window.confirm(`Bạn có chắc muốn xóa (lưu trữ) sản phẩm ID: ${productId}?`)) {
-            try {
-                // 2. Gọi API Service
-                await ProductService.deleteProduct(productId);
-
-                // 3. Xử lý thành công
-                alert('Sản phẩm đã được chuyển vào kho lưu trữ.');
-
-                // 4. Tải lại danh sách
-                // (Cách tốt hơn: Nếu sản phẩm là cái cuối cùng của trang,
-                // chúng ta nên lùi về trang trước, nhưng tạm thời tải lại trang hiện tại)
-                fetchProducts(currentPage);
-
-            } catch (err) {
-                // 5. Xử lý lỗi
-                alert('Lỗi khi xóa sản phẩm: ' + err.message);
-            }
+    // 6. Xử lý Xóa
+    const handleDelete = async (id) => {
+        try {
+            await ProductService.deleteProduct(id);
+            alert('Xóa (lưu trữ) sản phẩm thành công!');
+            // Tải lại trang hiện tại
+            fetchProducts(pagination.current, pagination.pageSize);
+        } catch (err) {
+            alert('Lỗi khi xóa sản phẩm: ' + err.message);
         }
     };
-    // ===============================================
 
+    // 7. Định nghĩa các cột (columns) cho Table
+    const columns = [
+        {
+            title: 'ID',
+            dataIndex: 'id',
+            key: 'id',
+            sorter: (a, b) => a.id - b.id, // (Sắp xếp local)
+        },
+        {
+            title: 'Ảnh',
+            dataIndex: 'defaultImage',
+            key: 'defaultImage',
+            render: (text) => <Image src={text} alt="Product" width={60} />,
+        },
+        {
+            title: 'Tên sản phẩm',
+            dataIndex: 'name',
+            key: 'name',
+        },
+        {
+            title: 'Danh mục',
+            dataIndex: 'categoryName',
+            key: 'categoryName',
+        },
+        {
+            title: 'Trạng thái',
+            dataIndex: 'status',
+            key: 'status',
+            render: (status) => (
+                <Tag color={status === 'Published' ? 'green' : (status === 'Draft' ? 'blue' : 'red')}>
+                    {status.toUpperCase()}
+                </Tag>
+            ),
+        },
+        {
+            title: 'Hành động',
+            key: 'action',
+            render: (text, record) => ( // 'record' là dữ liệu của hàng đó
+                <Space size="middle">
+                    <Button
+                        type="primary"
+                        icon={<EditOutlined />}
+                        onClick={() => navigate(`/admin/products/edit/${record.id}`)}
+                    >
+                        Sửa
+                    </Button>
+                    <Popconfirm
+                        title="Xóa sản phẩm?"
+                        description="Bạn có chắc muốn xóa (lưu trữ) sản phẩm này?"
+                        onConfirm={() => handleDelete(record.id)}
+                        okText="Đồng ý"
+                        cancelText="Hủy"
+                    >
+                        <Button type="primary" danger icon={<DeleteOutlined />}>
+                            Xóa
+                        </Button>
+                    </Popconfirm>
+                </Space>
+            ),
+        },
+    ];
 
-    // (Render loading/error giữ nguyên)
-    if (loading) return <p>Đang tải...</p>;
-    if (error) return <p style={errorStyle}>Lỗi: {error}</p>;
-
+    // 8. Render Giao diện
     return (
         <div>
-            <h2>Quản lý Sản phẩm</h2>
+            <Space direction="vertical" style={{ width: '100%' }}>
+                <Title level={2}>Quản lý Sản phẩm</Title>
 
-            <Link to="/admin/products/new" style={addButtonStyle}>
-                + Thêm sản phẩm mới
-            </Link>
+                <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    style={{ marginBottom: 16 }}
+                    onClick={() => navigate('/admin/products/new')}
+                >
+                    Thêm sản phẩm mới
+                </Button>
 
-            <p>Tổng số sản phẩm: {totalElements}</p>
+                {error && <p style={{color: 'red'}}>Lỗi: {error}</p>}
 
-            <table style={tableStyle}>
-                <thead>
-                    <tr>
-                        {/* ... (Các <th> khác) ... */}
-                        <th style={thStyle}>Hành động</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {products.map(product => (
-                        <tr key={product.id}>
-                            {/* ... (Các <td> khác) ... */}
-                            <td style={thTdStyle}>{product.id}</td>
-                            <td style={thTdStyle}>{/* Ảnh */}</td>
-                            <td style={thTdStyle}>{product.name}</td>
-                            <td style={thTdStyle}>{product.categoryName}</td>
-                            <td style={thTdStyle}>{/* Giá */}</td>
-                            <td style={thTdStyle}>{product.status}</td>
-
-                            {/* CẬP NHẬT HÀNH ĐỘNG */}
-                            <td style={thTdStyle}>
-                                <Link
-                                    to={`/admin/products/edit/${product.id}`}
-                                    style={{...buttonStyle, backgroundColor: '#ffc107'}}
-                                >
-                                    Sửa
-                                </Link>
-
-                                {/* ========== CẬP NHẬT NÚT XÓA ========== */}
-                                <button
-                                    style={{...buttonStyle, backgroundColor: '#dc3545', color: 'white'}}
-                                    onClick={() => handleDeleteProduct(product.id)} // Gắn sự kiện
-                                >
-                                    Xóa
-                                </button>
-                                {/* ====================================== */}
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-
-            {/* (Pagination giữ nguyên) */}
-            <div style={paginationStyle}>
-                {/* ... (Nội dung pagination) ... */}
-            </div>
+                <Table
+                    columns={columns}
+                    dataSource={products} // Dữ liệu
+                    rowKey="id" // Khóa chính
+                    pagination={pagination} // Cấu hình phân trang
+                    loading={loading} // Hiệu ứng tải
+                    onChange={handleTableChange} // Xử lý khi đổi trang
+                    bordered
+                />
+            </Space>
         </div>
     );
 }

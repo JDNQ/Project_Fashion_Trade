@@ -1,6 +1,7 @@
 package com.example.fashion.dto;
 
 import com.example.fashion.entity.Order;
+import jakarta.persistence.EntityNotFoundException; // <-- 1. Import
 import lombok.Getter;
 import lombok.Setter;
 
@@ -21,26 +22,20 @@ public class OrderResponseDTO {
     private Long userId;
     private String userEmail;
 
-    // Thông tin tiền tệ
+    // (Các trường khác...)
     private BigDecimal totalAmount;
     private BigDecimal shippingFee;
     private BigDecimal discountAmount;
-
-    // Trạng thái
     private String payStatus;
     private String orderStatus;
     private String paymentMethod;
     private String trackingNumber;
-
-    // Địa chỉ giao hàng
     private String shippingName;
     private String shippingPhone;
     private String shippingAddressLine;
     private String shippingCity;
     private String shippingDistrict;
     private String shippingProvince;
-
-    // Các mục trong đơn hàng
     private Set<OrderItemResponseDTO> items;
 
     /**
@@ -53,10 +48,20 @@ public class OrderResponseDTO {
         dto.setCreatedAt(order.getCreatedAt());
         dto.setUpdatedAt(order.getUpdatedAt());
 
-        if (order.getUser() != null) {
-            dto.setUserId(order.getUser().getId());
-            dto.setUserEmail(order.getUser().getEmail());
+        // ========== SỬA LỖI Ở ĐÂY ==========
+        // Chúng ta dùng try-catch để xử lý trường hợp User bị xóa
+        try {
+            if (order.getUser() != null) {
+                // Dòng này sẽ gây lỗi nếu User (Proxy) không tìm thấy ID
+                dto.setUserId(order.getUser().getId());
+                dto.setUserEmail(order.getUser().getEmail());
+            }
+        } catch (EntityNotFoundException e) {
+            // Nếu User không còn tồn tại (ví dụ: User ID 3 đã bị xóa)
+            dto.setUserId(null); // Ghi nhận là không có ID
+            dto.setUserEmail("[Người dùng đã bị xóa]"); // Hiển thị thông báo
         }
+        // ===================================
 
         dto.setTotalAmount(order.getTotalAmount());
         dto.setShippingFee(order.getShippingFee());

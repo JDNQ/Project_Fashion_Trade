@@ -91,6 +91,15 @@ public class CategoryService {
             category.getChildren().forEach(child -> child.setParent(null));
         }
 
+
+
         categoryRepository.delete(category);
+
+
+    }
+    public CategoryResponseDTO getCategoryById(Long categoryId) {
+        Category category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy Category ID: " + categoryId));
+        return CategoryResponseDTO.fromCategory(category);
     }
 }

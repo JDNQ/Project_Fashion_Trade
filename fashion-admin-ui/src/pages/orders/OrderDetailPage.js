@@ -1,207 +1,176 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import OrderService from '../../services/OrderService';
+import {
+    Spin,
+    Row,
+    Col,
+    Card,
+    Typography,
+    Descriptions,
+    Tag,
+    Table,
+    Select,
+    Button,
+    Form,
+    Input,
+    notification
+} from 'antd';
 
-// (Styles - Bạn nên đưa vào CSS sau)
-const pageStyle = { display: 'flex', gap: '20px', padding: '20px' };
-const mainContentStyle = { flex: 2 };
-const sidebarStyle = { flex: 1, background: '#f9f9f9', padding: '20px', borderRadius: '5px' };
-const sectionStyle = { marginBottom: '20px' };
-const h3Style = { borderBottom: '2px solid #eee', paddingBottom: '10px' };
-const tableStyle = { width: '100%', borderCollapse: 'collapse', marginTop: '10px' };
-const thTdStyle = { border: '1px solid #ddd', padding: '8px' };
-const thStyle = { ...thTdStyle, backgroundColor: '#f2f2f2', textAlign: 'left' };
-const errorStyle = { color: 'red' };
-const labelStyle = { display: 'block', marginBottom: '5px', fontWeight: 'bold' };
-const inputStyle = { width: '100%', padding: '8px', boxSizing: 'border-box' };
-const buttonStyle = { padding: '10px 15px', backgroundColor: '#007bff', color: 'white', border: 'none', cursor: 'pointer', marginTop: '10px' };
+const { Title, Text } = Typography;
+const { Option } = Select;
 
 // (Các hàm format tiền tệ và ngày)
 const formatCurrency = (amount) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
 const formatDate = (dateString) => new Date(dateString).toLocaleString('vi-VN');
 
 function OrderDetailPage() {
-    const { id } = useParams(); // Lấy ID từ URL
-    const navigate = useNavigate();
+    const { id } = useParams();
+    const [form] = Form.useForm(); // Form để cập nhật
 
-    // 1. State cho dữ liệu
     const [order, setOrder] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-
-    // 2. State cho form cập nhật
-    const [orderStatus, setOrderStatus] = useState('');
-    const [payStatus, setPayStatus] = useState('');
-    const [trackingNumber, setTrackingNumber] = useState('');
     const [isUpdating, setIsUpdating] = useState(false);
 
-    // 3. Hàm tải dữ liệu đơn hàng
+    // 1. Hàm tải dữ liệu
     const fetchOrderDetails = async () => {
         try {
             setLoading(true);
-            setError(null);
             const data = await OrderService.getOrderById(id);
             setOrder(data);
 
-            // Điền (populate) dữ liệu vào form cập nhật
-            setOrderStatus(data.orderStatus);
-            setPayStatus(data.payStatus);
-            setTrackingNumber(data.trackingNumber || ''); // Xử lý null
+            // 2. Điền dữ liệu vào Form cập nhật
+            form.setFieldsValue({
+                orderStatus: data.orderStatus,
+                payStatus: data.payStatus,
+                trackingNumber: data.trackingNumber
+            });
 
         } catch (err) {
-            setError(err.message);
+            notification.error({ message: 'Lỗi tải đơn hàng', description: err.message });
         } finally {
             setLoading(false);
         }
     };
 
-    // 4. useEffect: Tải dữ liệu khi component mount
     useEffect(() => {
         fetchOrderDetails();
-    }, [id]); // Chạy lại nếu ID thay đổi
+    }, [id, form]);
 
-    // 5. Hàm xử lý Cập nhật trạng thái
-    const handleUpdateStatus = async (e) => {
-        e.preventDefault();
+    // 3. Hàm xử lý Cập nhật trạng thái
+    const handleUpdateStatus = async (values) => {
         setIsUpdating(true);
-        setError(null);
-
         try {
-            const updateData = {
-                orderStatus,
-                payStatus,
-                trackingNumber
-            };
-
-            await OrderService.updateOrderStatus(id, updateData);
-
-            alert('Cập nhật trạng thái thành công!');
-            // Tải lại dữ liệu để hiển thị thông tin mới nhất
-            await fetchOrderDetails();
-
+            await OrderService.updateOrderStatus(id, values);
+            notification.success({ message: 'Cập nhật thành công!' });
+            await fetchOrderDetails(); // Tải lại dữ liệu mới
         } catch (err) {
-            setError('Lỗi khi cập nhật: ' + err.message);
+            notification.error({ message: 'Cập nhật thất bại', description: err.message });
         } finally {
             setIsUpdating(false);
         }
     };
 
-    // 6. Render Giao diện
-    if (loading) {
-        return <p>Đang tải chi tiết đơn hàng...</p>;
-    }
+    // 4. Cột cho Bảng (Table) các sản phẩm
+    const itemColumns = [
+        { title: 'SKU', dataIndex: 'variantSku', key: 'sku' },
+        { title: 'Tên sản phẩm', dataIndex: 'productName', key: 'name' },
+        { title: 'Đơn giá', dataIndex: 'unitPrice', key: 'price', render: formatCurrency },
+        { title: 'Số lượng', dataIndex: 'quantity', key: 'qty' },
+        { title: 'Thành tiền', dataIndex: 'subtotal', key: 'subtotal', render: formatCurrency },
+    ];
 
-    if (error) {
-        return <p style={errorStyle}>Lỗi: {error}</p>;
+    if (loading) {
+        return <Spin tip="Đang tải chi tiết đơn hàng..." size="large" fullscreen />;
     }
 
     if (!order) {
         return <p>Không tìm thấy đơn hàng.</p>;
     }
 
+    // 5. Render
     return (
-        <div style={pageStyle}>
-
+        <Row gutter={24}>
             {/* CỘT BÊN TRÁI (CHI TIẾT) */}
-            <div style={mainContentStyle}>
-                <h2>Chi tiết Đơn hàng: {order.orderNo}</h2>
-                <p>Đặt lúc: {formatDate(order.createdAt)}</p>
+            <Col span={16}>
+                <Title level={3}>Chi tiết Đơn hàng: #{order.orderNo}</Title>
+                <Text type="secondary">Đặt lúc: {formatDate(order.createdAt)}</Text>
 
                 {/* Các mục đã mua */}
-                <div style={sectionStyle}>
-                    <h3 style={h3Style}>Sản phẩm đã mua</h3>
-                    <table style={tableStyle}>
-                        <thead>
-                            <tr>
-                                <th style={thStyle}>SKU</th>
-                                <th style={thStyle}>Tên sản phẩm</th>
-                                <th style={thStyle}>Đơn giá</th>
-                                <th style={thStyle}>SL</th>
-                                <th style={thStyle}>Thành tiền</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {order.items.map(item => (
-                                <tr key={item.id}>
-                                    <td style={thTdStyle}>{item.variantSku}</td>
-                                    <td style={thTdStyle}>{item.productName}</td>
-                                    <td style={thTdStyle}>{formatCurrency(item.unitPrice)}</td>
-                                    <td style={thTdStyle}>{item.quantity}</td>
-                                    <td style={thTdStyle}>{formatCurrency(item.subtotal)}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                <Card title="Sản phẩm đã mua" style={{ marginTop: 24 }}>
+                    <Table
+                        columns={itemColumns}
+                        dataSource={order.items}
+                        rowKey="id"
+                        pagination={false}
+                        bordered
+                    />
+                </Card>
 
                 {/* Thông tin thanh toán */}
-                <div style={sectionStyle}>
-                    <h3 style={h3Style}>Chi tiết Thanh toán</h3>
-                    <p>Phương thức: {order.paymentMethod}</p>
-                    <p>Phí vận chuyển: {formatCurrency(order.shippingFee)}</p>
-                    <p>Giảm giá: {formatCurrency(order.discountAmount)}</p>
-                    <p style={{fontWeight: 'bold', fontSize: '1.2em'}}>
-                        Tổng cộng: {formatCurrency(order.totalAmount)}
-                    </p>
-                </div>
-            </div>
+                <Card title="Chi tiết Thanh toán" style={{ marginTop: 24 }}>
+                    <Descriptions bordered column={1} size="small">
+                        <Descriptions.Item label="Phương thức">{order.paymentMethod}</Descriptions.Item>
+                        <Descriptions.Item label="Phí vận chuyển">{formatCurrency(order.shippingFee)}</Descriptions.Item>
+                        <Descriptions.Item label="Giảm giá">{formatCurrency(order.discountAmount)}</Descriptions.Item>
+                        <Descriptions.Item label={<Text strong>Tổng cộng</Text>}>
+                            <Text strong style={{fontSize: '1.2em'}}>{formatCurrency(order.totalAmount)}</Text>
+                        </Descriptions.Item>
+                    </Descriptions>
+                </Card>
+            </Col>
 
-            {/* CỘT BÊN PHẢI (CẬP NHẬT & THÔNG TIN KH) */}
-            <div style={sidebarStyle}>
+            {/* CỘT BÊN PHẢI (CẬP NHẬT & THÔNG TIN) */}
+            <Col span={8}>
                 {/* Form Cập nhật trạng thái */}
-                <div style={sectionStyle}>
-                    <h3 style={h3Style}>Cập nhật Trạng thái</h3>
-                    <form onSubmit={handleUpdateStatus}>
-                        <div style={{marginBottom: '10px'}}>
-                            <label style={labelStyle}>Trạng thái Đơn hàng:</label>
-                            {/* (Bạn nên dùng <select> với các giá trị cố định) */}
-                            <input
-                                style={inputStyle}
-                                type="text"
-                                value={orderStatus}
-                                onChange={(e) => setOrderStatus(e.target.value)}
-                            />
-                        </div>
-                        <div style={{marginBottom: '10px'}}>
-                            <label style={labelStyle}>Trạng thái Thanh toán:</label>
-                            <input
-                                style={inputStyle}
-                                type="text"
-                                value={payStatus}
-                                onChange={(e) => setPayStatus(e.target.value)}
-                            />
-                        </div>
-                        <div style={{marginBottom: '10px'}}>
-                            <label style={labelStyle}>Mã vận đơn (Tracking):</label>
-                            <input
-                                style={inputStyle}
-                                type="text"
-                                value={trackingNumber}
-                                onChange={(e) => setTrackingNumber(e.target.value)}
-                            />
-                        </div>
-                        <button type="submit" style={buttonStyle} disabled={isUpdating}>
-                            {isUpdating ? 'Đang cập nhật...' : 'Cập nhật'}
-                        </button>
-                    </form>
-                </div>
+                <Card title="Cập nhật Trạng thái" style={{ marginBottom: 24 }}>
+                    <Form form={form} layout="vertical" onFinish={handleUpdateStatus}>
+                        <Form.Item name="orderStatus" label="Trạng thái Đơn hàng" rules={[{ required: true }]}>
+                            <Select>
+                                <Option value="Pending">Chờ xử lý (Pending)</Option>
+                                <Option value="Processing">Đang xử lý (Processing)</Option>
+                                <Option value="Shipped">Đã giao (Shipped)</Option>
+                                <Option value="Delivered">Hoàn thành (Delivered)</Option>
+                                <Option value="Cancelled">Đã hủy (Cancelled)</Option>
+                            </Select>
+                        </Form.Item>
+                        <Form.Item name="payStatus" label="Trạng thái Thanh toán" rules={[{ required: true }]}>
+                            <Select>
+                                <Option value="Pending">Chờ thanh toán (Pending)</Option>
+                                <Option value="Paid">Đã thanh toán (Paid)</Option>
+                                <Option value="Refunded">Đã hoàn tiền (Refunded)</Option>
+                            </Select>
+                        </Form.Item>
+                        <Form.Item name="trackingNumber" label="Mã vận đơn (Tracking)">
+                            <Input placeholder="Nhập mã vận đơn..." />
+                        </Form.Item>
+                        <Form.Item>
+                            <Button type="primary" htmlType="submit" loading={isUpdating} block>
+                                Cập nhật
+                            </Button>
+                        </Form.Item>
+                    </Form>
+                </Card>
 
                 {/* Thông tin Khách hàng */}
-                <div style={sectionStyle}>
-                    <h3 style={h3Style}>Khách hàng</h3>
-                    <p>Tên: {order.shippingName}</p>
-                    <p>Email: {order.userEmail}</p>
-                    <p>SĐT: {order.shippingPhone}</p>
-                </div>
+                <Card title="Thông tin Khách hàng" style={{ marginBottom: 24 }}>
+                    <Descriptions column={1} size="small">
+                        <Descriptions.Item label="Tên">{order.shippingName}</Descriptions.Item>
+                        <Descriptions.Item label="Email">{order.userEmail}</Descriptions.Item>
+                        <Descriptions.Item label="SĐT">{order.shippingPhone}</Descriptions.Item>
+                    </Descriptions>
+                </Card>
 
                 {/* Thông tin Giao hàng */}
-                <div style={sectionStyle}>
-                    <h3 style={h3Style}>Địa chỉ Giao hàng</h3>
-                    <p>{order.shippingAddressLine}</p>
-                    <p>{order.shippingDistrict}, {order.shippingCity}, {order.shippingProvince}</p>
-                </div>
-            </div>
-        </div>
+                <Card title="Địa chỉ Giao hàng">
+                    <p>
+                        {order.shippingAddressLine}<br/>
+                        {order.shippingDistrict}, {order.shippingCity}<br/>
+                        {order.shippingProvince}
+                    </p>
+                </Card>
+            </Col>
+        </Row>
     );
 }
 

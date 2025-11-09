@@ -1,135 +1,109 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import CategoryService from '../../services/CategoryService';
+import {
+    Form,
+    Button,
+    Input,
+    Select,
+    Switch,
+    Typography,
+    notification,
+    Card,
+    Spin
+} from 'antd';
 
-// (Styles - Giống hệt CreatePage)
-const formStyle = { maxWidth: '600px', margin: '20px auto', padding: '20px', border: '1px solid #ddd', borderRadius: '5px' };
-const formGroupStyle = { marginBottom: '15px' };
-const labelStyle = { display: 'block', marginBottom: '5px', fontWeight: 'bold' };
-const inputStyle = { width: '100%', padding: '8px', boxSizing: 'border-box' };
-const buttonStyle = { padding: '10px 15px', backgroundColor: '#007bff', color: 'white', border: 'none', cursor: 'pointer' };
-const errorStyle = { color: 'red' };
-const checkboxStyle = { marginLeft: '10px' };
+const { Title } = Typography;
+const { Option } = Select;
 
 function CategoryEditPage() {
     const navigate = useNavigate();
-    const { id } = useParams(); // Lấy ID từ URL
+    const { id } = useParams();
+    const [form] = Form.useForm();
 
-    // 1. State cho form
-    const [name, setName] = useState('');
-    const [slug, setSlug] = useState('');
-    const [description, setDescription] = useState('');
-    const [parentId, setParentId] = useState(null);
-    const [active, setActive] = useState(true);
-
-    // 2. State cho danh sách chọn
     const [allCategories, setAllCategories] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [isUpdating, setIsUpdating] = useState(false);
 
-    // 3. State cho loading/error
-    const [loading, setLoading] = useState(true); // True vì cần tải dữ liệu
-    const [error, setError] = useState(null);
-
-    // 4. useEffect: Tải đồng thời (danh sách Categories VÀ chi tiết Category)
+    // useEffect (Tải và Fill dữ liệu) - Giữ nguyên
     useEffect(() => {
         const loadData = async () => {
             try {
-                // (Giả định bạn đã thêm API GET /api/v1/admin/categories/{id} vào Backend)
                 const [catData, allCatsData] = await Promise.all([
                     CategoryService.getCategoryById(id),
                     CategoryService.getAllCategories()
                 ]);
 
-                // Điền (populate) dữ liệu vào form
-                setName(catData.name);
-                setSlug(catData.slug);
-                setDescription(catData.description || ''); // Xử lý null
-                setParentId(catData.parentId);
-                setActive(catData.active);
+                form.setFieldsValue({
+                    name: catData.name,
+                    slug: catData.slug,
+                    description: catData.description,
+                    parentId: catData.parentId,
+                    active: catData.active
+                });
 
-                // Lọc danh sách cha (không thể tự làm cha của chính mình)
                 setAllCategories(allCatsData.filter(cat => cat.id.toString() !== id.toString()));
 
             } catch (err) {
-                setError(err.message);
+                notification.error({ message: 'Lỗi tải dữ liệu', description: err.message });
             } finally {
                 setLoading(false);
             }
         };
         loadData();
-    }, [id]);
+    }, [id, form]);
 
-    // 5. Hàm Submit (Cập nhật)
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        setError(null);
-
+    // onFinish (Cập nhật) - Giữ nguyên
+    const onFinish = async (values) => {
+        setIsUpdating(true);
         try {
-            const categoryData = {
-                name, slug, description,
-                parentId: parentId || null,
-                active,
-                sortOrder: 0 // (Tạm thời)
-            };
-
+            const categoryData = { ...values, parentId: values.parentId || null };
             await CategoryService.updateCategory(id, categoryData);
-
-            alert('Cập nhật danh mục thành công!');
+            notification.success({ message: 'Cập nhật thành công!' });
             navigate('/admin/categories');
-
         } catch (err) {
-            setError(err.message || 'Lỗi không xác định');
-            setLoading(false);
+            notification.error({ message: 'Cập nhật thất bại', description: err.message });
+            setIsUpdating(false);
         }
     };
 
-    // 6. Render
-    if (loading) return <p>Đang tải dữ liệu...</p>;
-    if (error) return <p style={errorStyle}>Lỗi: {error}</p>;
+    if (loading) {
+        return <Spin tip="Đang tải dữ liệu..." size="large" fullscreen />;
+    }
 
     return (
-        <div style={formStyle}>
-            <h2>Chỉnh sửa Danh mục (ID: {id})</h2>
-            <form onSubmit={handleSubmit}>
-                {/* (Phần JSX của Form giống hệt CreatePage) */}
-                <div style={formGroupStyle}>
-                    <label style={labelStyle}>Tên Danh mục:</label>
-                    <input style={inputStyle} type="text" value={name} onChange={(e) => setName(e.target.value)} required />
-                </div>
-                <div style={formGroupStyle}>
-                    <label style={labelStyle}>Đường dẫn (Slug):</label>
-                    <input style={inputStyle} type="text" value={slug} onChange={(e) => setSlug(e.target.value)} required />
-                </div>
-                <div style={formGroupStyle}>
-                    <label style={labelStyle}>Mô tả:</label>
-                    <textarea style={inputStyle} value={description} onChange={(e) => setDescription(e.target.value)} />
-                </div>
-                <div style={formGroupStyle}>
-                    <label style={labelStyle}>Danh mục cha:</label>
-                    <select
-                        style={inputStyle}
-                        value={parentId || ''}
-                        onChange={(e) => setParentId(e.target.value)}
-                    >
-                        <option value="">-- Không có --</option>
+        <Card style={{ maxWidth: 600, margin: 'auto' }}>
+            {/* Đã xóa nút "Tạo bản sao" khỏi đây */}
+            <Title level={3}>Chỉnh sửa Danh mục (ID: {id})</Title>
+
+            <Form form={form} layout="vertical" onFinish={onFinish}>
+                {/* ... (Toàn bộ nội dung Form.Item giữ nguyên) ... */}
+                <Form.Item name="name" label="Tên Danh mục" rules={[{ required: true }]}>
+                    <Input />
+                </Form.Item>
+                <Form.Item name="slug" label="Đường dẫn (Slug)" rules={[{ required: true }]}>
+                    <Input />
+                </Form.Item>
+                <Form.Item name="description" label="Mô tả">
+                    <Input.TextArea rows={3} />
+                </Form.Item>
+                <Form.Item name="parentId" label="Danh mục cha">
+                    <Select placeholder="-- Không có --" allowClear>
                         {allCategories.map(cat => (
-                            <option key={cat.id} value={cat.id}>{cat.name}</option>
+                            <Option key={cat.id} value={cat.id}>{cat.name}</Option>
                         ))}
-                    </select>
-                </div>
-                <div style={formGroupStyle}>
-                    <label style={labelStyle}>Trạng thái:</label>
-                    <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
-                    <span style={checkboxStyle}>Hiển thị (Active)</span>
-                </div>
-
-                {error && <p style={errorStyle}>{error}</p>}
-
-                <button type="submit" style={buttonStyle} disabled={loading}>
-                    {loading ? 'Đang lưu...' : 'Lưu Cập nhật'}
-                </button>
-            </form>
-        </div>
+                    </Select>
+                </Form.Item>
+                <Form.Item name="active" label="Trạng thái" valuePropName="checked">
+                    <Switch checkedChildren="Hoạt động" unCheckedChildren="Ẩn" />
+                </Form.Item>
+                <Form.Item>
+                    <Button type="primary" htmlType="submit" loading={isUpdating}>
+                        Lưu Cập nhật
+                    </Button>
+                </Form.Item>
+            </Form>
+        </Card>
     );
 }
 

@@ -1,217 +1,212 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom'; // Import thêm useParams
+import { useNavigate, useParams } from 'react-router-dom';
 import ProductService from '../../services/ProductService';
 import CategoryService from '../../services/CategoryService';
 import BrandService from '../../services/BrandService';
+import {
+    Form,
+    Input,
+    Button,
+    Select,
+    InputNumber,
+    Space,
+    Typography,
+    notification,
+    Row,
+    Col,
+    Spin
+} from 'antd';
+import { PlusOutlined, MinusCircleOutlined } from '@ant-design/icons';
 
-// (Toàn bộ styles giữ nguyên như ProductCreatePage)
-const formStyle = { maxWidth: '800px', margin: '20px auto', padding: '20px', border: '1px solid #ddd', borderRadius: '5px' };
-const formGroupStyle = { marginBottom: '15px' };
-const labelStyle = { display: 'block', marginBottom: '5px', fontWeight: 'bold' };
-const inputStyle = { width: '100%', padding: '8px', boxSizing: 'border-box' };
-const buttonStyle = { padding: '10px 15px', backgroundColor: '#007bff', color: 'white', border: 'none', cursor: 'pointer', marginRight: '10px' };
-const errorStyle = { color: 'red', marginTop: '10px' };
-const sectionStyle = { border: '1px solid #eee', padding: '15px', marginTop: '20px', borderRadius: '5px' };
-const dynamicRowStyle = { display: 'flex', gap: '10px', marginBottom: '10px' };
-const dynamicInputStyle = { flex: 1, padding: '8px', boxSizing: 'border-box' };
-const removeBtnStyle = { padding: '8px', backgroundColor: '#dc3545', color: 'white', border: 'none', cursor: 'pointer' };
+const { Title } = Typography;
+const { Option } = Select;
+const { TextArea } = Input;
+
+const formLayout = {
+    labelCol: { span: 24 },
+    wrapperCol: { span: 24 },
+};
 
 function ProductEditPage() {
     const navigate = useNavigate();
-    const { id } = useParams(); // 1. Lấy 'id' từ URL
+    const { id } = useParams();
+    const [form] = Form.useForm();
 
-    // 2. State (giống hệt CreatePage)
-    const [product, setProduct] = useState({
-        name: '', slug: '', description: '', status: 'Draft',
-        defaultImage: '', categoryId: '', brandId: '',
-        seoMetaTitle: '', seoMetaDesc: ''
-    });
     const [categories, setCategories] = useState([]);
     const [brands, setBrands] = useState([]);
-    const [variants, setVariants] = useState([]);
-    const [images, setImages] = useState([]);
-    const [loading, setLoading] = useState(true); // Mặc định là true để tải dữ liệu
-    const [error, setError] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // 3. useEffect: Tải Categories, Brands VÀ Dữ liệu Sản phẩm
+    // useEffect để Tải và Điền (Fill) dữ liệu
     useEffect(() => {
         const loadData = async () => {
             try {
-                // Tải đồng thời 3 nguồn dữ liệu
                 const [productData, catData, brandData] = await Promise.all([
                     ProductService.getProductById(id),
                     CategoryService.getAllCategories(),
                     BrandService.getAllBrands()
                 ]);
 
-                // 4. Điền (Populate) dữ liệu vào state
                 setCategories(catData);
                 setBrands(brandData);
 
-                // Điền thông tin sản phẩm
-                setProduct({
+                // Đây là phần "Fill thông tin"
+                form.setFieldsValue({
                     name: productData.name,
                     slug: productData.slug,
                     description: productData.description,
                     status: productData.status,
-                    defaultImage: productData.defaultImage || '', // Xử lý null
+                    defaultImage: productData.defaultImage,
                     categoryId: productData.categoryId,
                     brandId: productData.brandId,
-                    seoMetaTitle: productData.seoMetaTitle || '',
-                    seoMetaDesc: productData.seoMetaDesc || ''
+                    seoMetaTitle: productData.seoMetaTitle,
+                    seoMetaDesc: productData.seoMetaDesc,
+                    variants: productData.variants,
+                    images: productData.images
                 });
-
-                // Điền variants (cần map lại để bỏ các trường không cần thiết)
-                setVariants(productData.variants.map(v => ({
-                    sku: v.sku,
-                    attributes: v.attributes,
-                    price: v.price,
-                    salePrice: v.salePrice,
-                    stockQuantity: v.stockQuantity
-                })));
-
-                // Điền images
-                setImages(productData.images.map(img => ({
-                    url: img.url,
-                    altText: img.altText
-                })));
 
                 setLoading(false);
             } catch (err) {
-                setError('Không thể tải dữ liệu sản phẩm.');
+                notification.error({ message: 'Lỗi tải dữ liệu', description: err.message });
                 setLoading(false);
             }
         };
         loadData();
-    }, [id]); // Chạy lại nếu ID thay đổi
+    }, [id, form]);
 
-    // 5. Toàn bộ các hàm handlers (handleMainChange, handleVariantChange, addVariant, ...)
-    // giữ nguyên y hệt như ProductCreatePage
-    const handleMainChange = (e) => {
-        const { name, value } = e.target;
-        setProduct(prev => ({ ...prev, [name]: value }));
-    };
-    const handleVariantChange = (index, e) => {
-        const { name, value } = e.target;
-        const newVariants = [...variants];
-        newVariants[index][name] = value;
-        setVariants(newVariants);
-    };
-    const addVariant = () => { /* ... (Giống CreatePage) ... */ };
-    const removeVariant = (index) => { /* ... (Giống CreatePage) ... */ };
-    const handleImageChange = (index, e) => { /* ... (Giống CreatePage) ... */ };
-    const addImage = () => { /* ... (Giống CreatePage) ... */ };
-    const removeImage = (index) => { /* ... (Giống CreatePage) ... */ };
-
-    // 6. Hàm handleSubmit (CẬP NHẬT)
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        setError(null);
-
+    // Hàm Submit (Cập nhật)
+    const onFinish = async (values) => {
+        setIsSubmitting(true);
         try {
-            // Dữ liệu DTO (giống hệt Create)
             const productData = {
-                ...product,
-                variants: variants,
-                images: images
+                ...values,
+                variants: values.variants || [],
+                images: values.images || []
             };
-
-            // Gọi API Cập nhật
             await ProductService.updateProduct(id, productData);
-
-            alert('Cập nhật sản phẩm thành công!');
-            navigate('/admin/products'); // Chuyển về trang danh sách
-
+            notification.success({ message: 'Cập nhật thành công!' });
+            navigate('/admin/products');
         } catch (err) {
-            setError(err.message || 'Lỗi không xác định khi cập nhật.');
-            setLoading(false);
+            notification.error({ message: 'Cập nhật thất bại', description: err.message });
+            setIsSubmitting(false);
         }
     };
 
-    // 7. Render
     if (loading) {
-        return <p>Đang tải dữ liệu sản phẩm...</p>;
-    }
-
-    if (error) {
-        return <p style={errorStyle}>Lỗi: {error}</p>;
+        return <Spin tip="Đang tải dữ liệu sản phẩm..." size="large" fullscreen />;
     }
 
     return (
-        <div style={formStyle}>
-            <h2>Chỉnh sửa Sản phẩm (ID: {id})</h2>
+        <div style={{ maxWidth: '1000px', margin: 'auto' }}>
+            {/* Đã xóa nút "Tạo bản sao" khỏi đây */}
+            <Title level={2}>Chỉnh sửa Sản phẩm (ID: {id})</Title>
 
-            {/* PHẦN FORM JSX (HTML) GIỮ NGUYÊN Y HỆT
-              NHƯ TRONG ProductCreatePage.js
-              (Vì 'value' đã được bind với state)
-            */}
+            <Form
+                {...formLayout}
+                form={form}
+                name="edit_product"
+                onFinish={onFinish}
+            >
+                {/* (Nội dung Form y hệt như ProductCreatePage) */}
+                <Row gutter={24}>
+                    <Col span={16}>
+                        {/* ... (Các Form.Item cho name, description) ... */}
+                        <Form.Item name="name" label="Tên sản phẩm" rules={[{ required: true }]}>
+                            <Input />
+                        </Form.Item>
+                        <Form.Item name="description" label="Mô tả">
+                            <TextArea rows={4} />
+                        </Form.Item>
 
-            <form onSubmit={handleSubmit}>
-                {/* --- PHẦN THÔNG TIN CHÍNH --- */}
-                <div style={sectionStyle}>
-                    <div style={formGroupStyle}>
-                        <label style={labelStyle}>Tên sản phẩm:</label>
-                        <input style={inputStyle} type="text" name="name" value={product.name} onChange={handleMainChange} required />
-                    </div>
-                    <div style={formGroupStyle}>
-                        <label style={labelStyle}>Đường dẫn (Slug):</label>
-                        <input style={inputStyle} type="text" name="slug" value={product.slug} onChange={handleMainChange} required />
-                    </div>
-                     <div style={formGroupStyle}>
-                        <label style={labelStyle}>Mô tả:</label>
-                        <textarea style={inputStyle} name="description" value={product.description} onChange={handleMainChange} />
-                    </div>
-                     <div style={formGroupStyle}>
-                        <label style={labelStyle}>Ảnh đại diện (URL):</label>
-                        <input style={inputStyle} type="text" name="defaultImage" value={product.defaultImage} onChange={handleMainChange} />
-                    </div>
-                    <div style={formGroupStyle}>
-                        <label style={labelStyle}>Danh mục:</label>
-                        <select style={inputStyle} name="categoryId" value={product.categoryId} onChange={handleMainChange} required>
-                            <option value="">-- Chọn Danh mục --</option>
-                            {categories.map(cat => (
-                                <option key={cat.id} value={cat.id}>{cat.name}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div style={formGroupStyle}>
-                        <label style={labelStyle}>Thương hiệu:</label>
-                        <select style={inputStyle} name="brandId" value={product.brandId} onChange={handleMainChange} required>
-                            <option value="">-- Chọn Thương hiệu --</option>
-                            {brands.map(brand => (
-                                <option key={brand.id} value={brand.id}>{brand.name}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div style={formGroupStyle}>
-                        <label style={labelStyle}>Trạng thái:</label>
-                        <select style={inputStyle} name="status" value={product.status} onChange={handleMainChange}>
-                            <option value="Draft">Bản nháp (Draft)</option>
-                            <option value="Published">Công bố (Published)</option>
-                            <option value="Archived">Lưu trữ (Archived)</option>
-                        </select>
-                    </div>
-                </div>
+                        {/* Variants */}
+                        <Form.Item label="Biến thể sản phẩm (Variants)">
+                            <Form.List name="variants">
+                                {(fields, { add, remove }) => (
+                                    <div style={{ display: 'flex', flexDirection: 'column', rowGap: 16 }}>
+                                        {fields.map(({ key, name, ...restField }) => (
+                                            <Space key={key} style={{ display: 'flex' }} align="baseline">
+                                                <Form.Item {...restField} name={[name, 'sku']} rules={[{ required: true }]}>
+                                                    <Input placeholder="SKU" />
+                                                </Form.Item>
+                                                <Form.Item {...restField} name={[name, 'attributes']}>
+                                                    <Input placeholder='{"size":"M"}' />
+                                                </Form.Item>
+                                                <Form.Item {...restField} name={[name, 'price']} rules={[{ required: true }]}>
+                                                    <InputNumber placeholder="Giá" min={0} style={{width: '100%'}} />
+                                                </Form.Item>
+                                                <Form.Item {...restField} name={[name, 'stockQuantity']} rules={[{ required: true }]}>
+                                                    <InputNumber placeholder="Tồn kho" min={0} style={{width: '100%'}} />
+                                                </Form.Item>
+                                                <MinusCircleOutlined onClick={() => remove(name)} />
+                                            </Space>
+                                        ))}
+                                        <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
+                                            Thêm biến thể
+                                        </Button>
+                                    </div>
+                                )}
+                            </Form.List>
+                        </Form.Item>
 
-                {/* --- PHẦN BIẾN THỂ (VARIANTS) --- */}
-                <div style={sectionStyle}>
-                    {/* (Code JSX y hệt ProductCreatePage) */}
-                </div>
+                        {/* Images */}
+                        <Form.Item label="Hình ảnh sản phẩm">
+                            <Form.List name="images">
+                                {(fields, { add, remove }) => (
+                                    <div style={{ display: 'flex', flexDirection: 'column', rowGap: 16 }}>
+                                        {fields.map(({ key, name, ...restField }) => (
+                                            <Space key={key} style={{ display: 'flex' }} align="baseline">
+                                                <Form.Item {...restField} name={[name, 'url']} rules={[{ required: true }]}>
+                                                    <Input placeholder="URL Hình ảnh" style={{width: '300px'}} />
+                                                </Form.Item>
+                                                <Form.Item {...restField} name={[name, 'altText']}>
+                                                    <Input placeholder="Alt Text" />
+                                                </Form.Item>
+                                                <MinusCircleOutlined onClick={() => remove(name)} />
+                                            </Space>
+                                        ))}
+                                        <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
+                                            Thêm hình ảnh
+                                        </Button>
+                                    </div>
+                                )}
+                            </Form.List>
+                        </Form.Item>
+                    </Col>
 
-                {/* --- PHẦN HÌNH ẢNH (IMAGES) --- */}
-                <div style={sectionStyle}>
-                    {/* (Code JSX y hệt ProductCreatePage) */}
-                </div>
+                    {/* CỘT BÊN PHẢI */}
+                    <Col span={8}>
+                        {/* ... (Các Form.Item cho status, categoryId, brandId, v.v...) ... */}
+                        <Form.Item name="status" label="Trạng thái" rules={[{ required: true }]}>
+                            <Select>
+                                <Option value="Draft">Bản nháp</Option>
+                                <Option value="Published">Công bố</Option>
+                                <Option value="Archived">Lưu trữ</Option>
+                            </Select>
+                        </Form.Item>
+                        <Form.Item name="categoryId" label="Danh mục" rules={[{ required: true }]}>
+                            <Select placeholder="-- Chọn Danh mục --">
+                                {categories.map(cat => (
+                                    <Option key={cat.id} value={cat.id}>{cat.name}</Option>
+                                ))}
+                            </Select>
+                        </Form.Item>
+                        <Form.Item name="brandId" label="Thương hiệu" rules={[{ required: true }]}>
+                            <Select placeholder="-- Chọn Thương hiệu --">
+                                {brands.map(brand => (
+                                    <Option key={brand.id} value={brand.id}>{brand.name}</Option>
+                                ))}
+                            </Select>
+                        </Form.Item>
+                        {/* ... (Các Form.Item khác) ... */}
+                    </Col>
+                </Row>
 
-                {/* --- SUBMIT --- */}
-                {error && <p style={errorStyle}>{error}</p>}
-                <div style={{ marginTop: '20px' }}>
-                    <button type="submit" style={buttonStyle} disabled={loading}>
-                        {loading ? 'Đang lưu...' : 'Lưu Cập nhật'}
-                    </button>
-                </div>
-            </form>
+                <Form.Item>
+                    <Button type="primary" htmlType="submit" loading={isSubmitting} style={{marginTop: '20px'}}>
+                        Lưu Cập nhật
+                    </Button>
+                </Form.Item>
+            </Form>
         </div>
     );
 }

@@ -5,7 +5,7 @@ import com.example.fashion.service.CustomUserDetailsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod; // <-- 1. Import HttMethod
+import org.springframework.http.HttpMethod; // <-- Import dòng này
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -41,7 +41,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
-                // (Bảo Spring Security sử dụng cấu hình CORS từ WebConfig.java)
+                // 1. Kích hoạt cấu hình CORS (để nó đọc WebConfig.java)
                 .cors(cors -> cors.configure(http))
 
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -49,17 +49,18 @@ public class SecurityConfig {
                 // Phân quyền truy cập
                 .authorizeHttpRequests(auth -> auth
 
-                        // ========== 2. THÊM DÒNG NÀY ==========
-                        // Cho phép TẤT CẢ các yêu cầu OPTIONS (để fix lỗi CORS 403)
+                        // 2. Cho phép TẤT CẢ các yêu cầu OPTIONS (để fix lỗi CORS 403)
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        // ===================================
 
-                        // Các quy tắc cũ
+                        // 3. Các quy tắc chuẩn
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/api/v1/admin/products/**").hasAnyAuthority("PRODUCT_MANAGER", "SUPER_ADMIN")
                         .requestMatchers("/api/v1/admin/categories/**").hasAnyAuthority("PRODUCT_MANAGER", "SUPER_ADMIN")
                         .requestMatchers("/api/v1/admin/brands/**").hasAnyAuthority("PRODUCT_MANAGER", "SUPER_ADMIN")
+
+                        // 4. Đây là dòng gây lỗi 403
                         .requestMatchers("/api/v1/admin/orders/**").hasAnyAuthority("ORDER_MANAGER", "SUPER_ADMIN")
+
                         .requestMatchers("/api/v1/admin/users/**").hasAuthority("SUPER_ADMIN")
                         .requestMatchers("/api/v1/admin/**").hasAnyAuthority("PRODUCT_MANAGER", "ORDER_MANAGER", "SUPER_ADMIN")
 

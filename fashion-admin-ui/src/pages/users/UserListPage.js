@@ -1,45 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom'; // Import Link
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import UserService from '../../services/UserService';
+import { Table, Button, Space, Tag, Typography, Popconfirm, Tooltip } from 'antd'; // Import component AntD
+import { EditOutlined, LockOutlined, UnlockOutlined } from '@ant-design/icons'; // Import icons
 
-// Styles (Giữ nguyên)
-const tableStyle = {
-    width: '100%',
-    borderCollapse: 'collapse',
-    marginTop: '20px'
-};
-const thTdStyle = {
-    border: '1px solid #ddd',
-    padding: '8px',
-    textAlign: 'left'
-};
-const thStyle = {
-    ...thTdStyle,
-    backgroundColor: '#f2f2f2'
-};
-const errorStyle = {
-    color: 'red'
-};
-// Style cho các nút
-const buttonStyle = {
-    marginRight: '5px',
-    padding: '5px 10px',
-    cursor: 'pointer',
-    border: 'none',
-    borderRadius: '3px'
-};
-const editButtonStyle = { ...buttonStyle, backgroundColor: '#ffc107', color: 'black', textDecoration: 'none' };
-const lockButtonStyle = { ...buttonStyle, backgroundColor: '#dc3545', color: 'white' };
-const unlockButtonStyle = { ...buttonStyle, backgroundColor: '#28a745', color: 'white' };
+const { Title } = Typography;
 
+// Hàm gán màu cho Vai trò (Tùy chọn)
+const getRoleColor = (role) => {
+    switch (role) {
+        case 'SUPER_ADMIN': return 'red';
+        case 'PRODUCT_MANAGER': return 'blue';
+        case 'ORDER_MANAGER': return 'orange';
+        case 'CUSTOMER': return 'green';
+        default: return 'default';
+    }
+};
 
 function UserListPage() {
-    // ... (State: users, loading, error giữ nguyên) ...
+    const navigate = useNavigate(); // Hook để điều hướng
+
+    // 1. State
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // ... (Hàm fetchUsers và useEffect giữ nguyên) ...
+    // 2. Hàm fetch dữ liệu
     const fetchUsers = async () => {
         try {
             setLoading(true);
@@ -53,93 +39,113 @@ function UserListPage() {
         }
     };
 
+    // 3. useEffect: Tải dữ liệu khi mount
     useEffect(() => {
         fetchUsers();
     }, []);
 
-    // ========== THÊM MỚI: HÀM XỬ LÝ KHÓA/MỞ ==========
+    // 4. Hàm xử lý Khóa/Mở
     const handleToggleStatus = async (userId, currentStatus) => {
-        // 1. Xác định trạng thái mới
         const newStatus = currentStatus === 'active' ? 'locked' : 'active';
-        const actionText = newStatus === 'locked' ? 'khóa' : 'mở khóa';
-
-        // 2. Xác nhận
-        if (window.confirm(`Bạn có chắc muốn ${actionText} người dùng ID: ${userId}?`)) {
-            try {
-                // 3. Gọi API Service
-                await UserService.updateUserStatus(userId, newStatus);
-
-                // 4. Xử lý thành công
-                alert(`Đã ${actionText} người dùng thành công.`);
-
-                // 5. Tải lại dữ liệu (Cách đơn giản)
-                // (Cách tốt hơn: Cập nhật state 'users' trực tiếp)
-                fetchUsers();
-
-            } catch (err) {
-                // 6. Xử lý lỗi
-                alert(`Lỗi khi ${actionText} người dùng: ${err.message}`);
-            }
+        try {
+            await UserService.updateUserStatus(userId, newStatus);
+            alert(`Đã ${newStatus === 'locked' ? 'khóa' : 'mở khóa'} người dùng thành công.`);
+            fetchUsers(); // Tải lại dữ liệu
+        } catch (err) {
+            alert(`Lỗi khi cập nhật trạng thái: ${err.message}`);
         }
     };
-    // ===============================================
 
+    // 5. Định nghĩa các cột (columns) cho Table
+    const columns = [
+        {
+            title: 'ID',
+            dataIndex: 'id',
+            key: 'id',
+            sorter: (a, b) => a.id - b.id,
+        },
+        {
+            title: 'Email',
+            dataIndex: 'email',
+            key: 'email',
+        },
+        {
+            title: 'Họ tên',
+            dataIndex: 'fullName',
+            key: 'fullName',
+        },
+        {
+            title: 'Vai trò (Roles)',
+            dataIndex: 'roles',
+            key: 'roles',
+            render: (roles) => (
+                <span>
+                    {roles?.map(role => (
+                        <Tag color={getRoleColor(role)} key={role}>
+                            {role}
+                        </Tag>
+                    ))}
+                </span>
+            ),
+        },
+        {
+            title: 'Trạng thái',
+            dataIndex: 'status',
+            key: 'status',
+            render: (status) => (
+                <Tag color={status === 'active' ? 'green' : 'red'}>
+                    {status.toUpperCase()}
+                </Tag>
+            ),
+        },
+        {
+            title: 'Hành động',
+            key: 'action',
+            render: (text, record) => ( // 'record' là dữ liệu của hàng đó
+                <Space size="middle">
+                    <Tooltip title="Sửa vai trò">
+                        <Button
+                            type="primary"
+                            icon={<EditOutlined />}
+                            onClick={() => navigate(`/admin/users/edit/${record.id}`)}
+                        />
+                    </Tooltip>
 
-    // (Render loading/error giữ nguyên)
-    if (loading) {
-        return <p>Đang tải danh sách người dùng...</p>;
-    }
-    if (error) {
-        return <p style={errorStyle}>Lỗi: {error}</p>;
-    }
+                    <Popconfirm
+                        title={record.status === 'active' ? "Khóa người dùng?" : "Mở khóa người dùng?"}
+                        description={`Bạn có chắc muốn ${record.status === 'active' ? 'khóa' : 'mở khóa'} tài khoản này?`}
+                        onConfirm={() => handleToggleStatus(record.id, record.status)}
+                        okText="Đồng ý"
+                        cancelText="Hủy"
+                    >
+                        <Button
+                            danger={record.status === 'active'}
+                            icon={record.status === 'active' ? <LockOutlined /> : <UnlockOutlined />}
+                        />
+                    </Popconfirm>
+                </Space>
+            ),
+        },
+    ];
 
+    // 6. Render Giao diện
     return (
         <div>
-            <h2>Quản lý Người dùng</h2>
-            <p>Tổng số người dùng: {users.length}</p>
+            <Space direction="vertical" style={{ width: '100%' }}>
+                <Title level={2}>Quản lý Người dùng</Title>
 
-            <table style={tableStyle}>
-                <thead>
-                    <tr>
-                        <th style={thStyle}>ID</th>
-                        <th style={thStyle}>Email</th>
-                        <th style={thStyle}>Họ tên</th>
-                        <th style={thStyle}>Vai trò (Roles)</th>
-                        <th style={thStyle}>Trạng thái</th>
-                        <th style={thStyle}>Hành động</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {users.map(user => (
-                        <tr key={user.id}>
-                            <td style={thTdStyle}>{user.id}</td>
-                            <td style={thTdStyle}>{user.email}</td>
-                            <td style={thTdStyle}>{user.fullName}</td>
-                            <td style={thTdStyle}>
-                                {user.roles ? user.roles.join(', ') : 'N/A'}
-                            </td>
-                            <td style={thTdStyle}>{user.status}</td>
+                {error && <p style={{color: 'red'}}>Lỗi: {error}</p>}
 
-                            {/* ========== CẬP NHẬT HÀNH ĐỘNG ========== */}
-                            <td style={thTdStyle}>
-                                {/* Nút Sửa (chưa có logic) */}
-                                <Link to={`/admin/users/edit/${user.id}`} style={editButtonStyle}>
-                                    Sửa
-                                </Link>
-
-                                {/* Nút Khóa / Mở */}
-                                <button
-                                    style={user.status === 'active' ? lockButtonStyle : unlockButtonStyle}
-                                    onClick={() => handleToggleStatus(user.id, user.status)}
-                                >
-                                    {user.status === 'active' ? 'Khóa' : 'Mở'}
-                                </button>
-                            </td>
-                            {/* ======================================= */}
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+                <Table
+                    columns={columns}
+                    dataSource={users} // Dữ liệu
+                    rowKey="id" // Khóa chính
+                    pagination={{ pageSize: 10 }} // Cấu hình phân trang (local)
+                    loading={loading} // Hiệu ứng tải
+                    bordered
+                    scroll={{ x: 'max-content' }}
+                />
+            </Space>
         </div>
     );
 }

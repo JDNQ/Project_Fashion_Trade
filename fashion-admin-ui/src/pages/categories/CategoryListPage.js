@@ -1,16 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import CategoryService from '../../services/CategoryService';
+import {
+    Table,
+    Button,
+    Space,
+    Tag,
+    Typography,
+    Popconfirm,
+    notification
+} from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 
-// (Styles - Tương tự các trang List khác)
-const tableStyle = { width: '100%', borderCollapse: 'collapse', marginTop: '20px' };
-const thTdStyle = { border: '1px solid #ddd', padding: '8px', textAlign: 'left' };
-const thStyle = { ...thTdStyle, backgroundColor: '#f2f2f2' };
-const errorStyle = { color: 'red' };
-const buttonStyle = { margin: '0 5px', padding: '5px 10px', cursor: 'pointer', textDecoration: 'none' };
-const addButtonStyle = { display: 'inline-block', padding: '10px 15px', backgroundColor: '#28a745', color: 'white', textDecoration: 'none', borderRadius: '5px', marginBottom: '20px' };
+const { Title } = Typography;
 
 function CategoryListPage() {
+    const navigate = useNavigate();
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -24,6 +29,7 @@ function CategoryListPage() {
             setCategories(data);
         } catch (err) {
             setError(err.message);
+            notification.error({ message: 'Lỗi tải danh mục', description: err.message });
         } finally {
             setLoading(false);
         }
@@ -36,66 +42,104 @@ function CategoryListPage() {
 
     // 3. Hàm xử lý Xóa
     const handleDelete = async (id) => {
-        if (window.confirm(`Bạn có chắc muốn xóa danh mục ID: ${id}?`)) {
-            try {
-                await CategoryService.deleteCategory(id);
-                alert('Xóa danh mục thành công.');
-                fetchCategories(); // Tải lại danh sách
-            } catch (err) {
-                alert('Lỗi khi xóa danh mục: ' + err.message);
-            }
+        try {
+            await CategoryService.deleteCategory(id);
+            notification.success({ message: 'Xóa danh mục thành công.' });
+            fetchCategories(); // Tải lại danh sách
+        } catch (err) {
+            notification.error({ message: 'Lỗi khi xóa danh mục', description: err.message });
         }
     };
 
-    // 4. Render
-    if (loading) return <p>Đang tải danh mục...</p>;
-    if (error) return <p style={errorStyle}>Lỗi: {error}</p>;
+    // 4. Định nghĩa các cột (columns) cho Table
+    const columns = [
+        {
+            title: 'ID',
+            dataIndex: 'id',
+            key: 'id',
+            sorter: (a, b) => a.id - b.id,
+        },
+        {
+            title: 'Tên',
+            dataIndex: 'name',
+            key: 'name',
+        },
+        {
+            title: 'Slug',
+            dataIndex: 'slug',
+            key: 'slug',
+        },
+        {
+            title: 'Danh mục cha',
+            dataIndex: 'parentName',
+            key: 'parentName',
+            render: (parentName) => parentName || 'N/A',
+        },
+        {
+            title: 'Trạng thái',
+            dataIndex: 'active',
+            key: 'active',
+            render: (active) => (
+                <Tag color={active ? 'green' : 'red'}>
+                    {active ? 'Hoạt động' : 'Ẩn'}
+                </Tag>
+            ),
+        },
+        {
+            title: 'Hành động',
+            key: 'action',
+            render: (text, record) => (
+                <Space size="middle">
+                    <Button
+                        type="primary"
+                        icon={<EditOutlined />}
+                        onClick={() => navigate(`/admin/categories/edit/${record.id}`)}
+                    >
+                        Sửa
+                    </Button>
+                    <Popconfirm
+                        title="Xóa danh mục?"
+                        description="Bạn có chắc muốn xóa danh mục này?"
+                        onConfirm={() => handleDelete(record.id)}
+                        okText="Đồng ý"
+                        cancelText="Hủy"
+                    >
+                        <Button type="primary" danger icon={<DeleteOutlined />}>
+                            Xóa
+                        </Button>
+                    </Popconfirm>
+                </Space>
+            ),
+        },
+    ];
 
+    // 5. Render
     return (
         <div>
-            <h2>Quản lý Danh mục</h2>
+            <Space direction="vertical" style={{ width: '100%' }}>
+                <Title level={2}>Quản lý Danh mục</Title>
 
-            <Link to="/admin/categories/new" style={addButtonStyle}>
-                + Thêm danh mục mới
-            </Link>
+                <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    style={{ marginBottom: 16 }}
+                    onClick={() => navigate('/admin/categories/new')}
+                >
+                    Thêm danh mục mới
+                </Button>
 
-            <table style={tableStyle}>
-                <thead>
-                    <tr>
-                        <th style={thStyle}>ID</th>
-                        <th style={thStyle}>Tên</th>
-                        <th style={thStyle}>Slug</th>
-                        <th style={thStyle}>Danh mục cha</th>
-                        <th style={thStyle}>Trạng thái</th>
-                        <th style={thStyle}>Hành động</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {categories.map(cat => (
-                        <tr key={cat.id}>
-                            <td style={thTdStyle}>{cat.id}</td>
-                            <td style={thTdStyle}>{cat.name}</td>
-                            <td style={thTdStyle}>{cat.slug}</td>
-                            <td style={thTdStyle}>{cat.parentName || 'N/A'} (ID: {cat.parentId || ''})</td>
-                            <td style={thTdStyle}>{cat.active ? 'Hoạt động' : 'Ẩn'}</td>
-                            <td style={thTdStyle}>
-                                <Link
-                                    to={`/admin/categories/edit/${cat.id}`}
-                                    style={{...buttonStyle, backgroundColor: '#ffc107'}}
-                                >
-                                    Sửa
-                                </Link>
-                                <button
-                                    style={{...buttonStyle, backgroundColor: '#dc3545', color: 'white'}}
-                                    onClick={() => handleDelete(cat.id)}
-                                >
-                                    Xóa
-                                </button>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+                {error && <p style={{color: 'red'}}>Lỗi: {error}</p>}
+
+                <Table
+                    columns={columns}
+                    dataSource={categories}
+                    rowKey="id"
+                    pagination={{ pageSize: 10 }}
+                    loading={loading}
+                    bordered
+                    scroll={{ x: 'max-content' }}
+                />
+            </Space>
         </div>
     );
 }

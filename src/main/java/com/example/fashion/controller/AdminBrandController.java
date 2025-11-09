@@ -62,4 +62,13 @@ public class AdminBrandController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
         }
     }
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getBrandById(@PathVariable Long id) {
+        try {
+            BrandResponseDTO brand = brandService.getBrandById(id);
+            return ResponseEntity.ok(brand);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        }
+    }
 }

@@ -1,79 +1,54 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom'; // 1. Import Link
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import OrderService from '../../services/OrderService';
+import { Table, Button, Space, Tag, Typography, Popconfirm } from 'antd'; // Import component AntD
+import { EyeOutlined } from '@ant-design/icons'; // Import icons
 
-// (Styles)
-const tableStyle = {
-    width: '100%',
-    borderCollapse: 'collapse',
-    marginTop: '20px'
-};
-const thTdStyle = {
-    border: '1px solid #ddd',
-    padding: '8px',
-    textAlign: 'left'
-};
-const thStyle = {
-    ...thTdStyle,
-    backgroundColor: '#f2f2f2'
-};
-const errorStyle = {
-    color: 'red'
-};
-const paginationStyle = {
-    marginTop: '20px'
-};
-const buttonStyle = {
-    margin: '0 5px',
-    padding: '5px 10px',
-    cursor: 'pointer',
-    textDecoration: 'none' // Thêm cho Link
-};
+const { Title } = Typography;
 
-// Hàm tiện ích format tiền tệ
+// (Các hàm tiện ích - nên chuyển vào /utils/helpers.js)
 const formatCurrency = (amount) => {
     if (typeof amount !== 'number') return 'N/A';
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
 };
-
-// Hàm tiện ích format ngày
 const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     const options = { year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' };
     return new Date(dateString).toLocaleDateString('vi-VN', options);
 };
 
-
 function OrderListPage() {
-    // States
-    const [orders, setOrders] = useState([]);
-    const [currentPage, setCurrentPage] = useState(0);
-    const [totalPages, setTotalPages] = useState(0);
+    const navigate = useNavigate(); // Hook để điều hướng
 
-    // ========== ĐÂY LÀ DÒNG BỊ LỖI ==========
-    // Đảm bảo bạn đã khai báo 'totalElements' ở đây
-    const [totalElements, setTotalElements] = useState(0);
-    // ======================================
+    // 1. State cho dữ liệu
+    const [orders, setOrders] = useState([]);
+
+    // 2. State cho phân trang (Table tự quản lý)
+    const [pagination, setPagination] = useState({
+        current: 1, // AntD Table bắt đầu từ 1
+        pageSize: 10,
+        total: 0,
+    });
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Hàm fetch dữ liệu
-    const fetchOrders = async (page) => {
+    // 3. Hàm fetch dữ liệu (Cập nhật cho AntD)
+    const fetchOrders = async (page = 1, pageSize = 10) => {
         try {
             setLoading(true);
             setError(null);
 
-            const data = await OrderService.getAllOrders(page, 10, "createdAt,desc");
+            // Chuyển đổi (AntD page 1 = Spring Page 0)
+            const springPage = page - 1;
+            const data = await OrderService.getAllOrders(springPage, pageSize, "createdAt,desc");
 
             setOrders(data.content);
-            setTotalPages(data.totalPages);
-
-            // ========== VÀ SET GIÁ TRỊ CHO NÓ Ở ĐÂY ==========
-            setTotalElements(data.totalElements);
-            // ============================================
-
-            setCurrentPage(data.number);
+            setPagination({
+                current: data.number + 1,
+                pageSize: data.size,
+                total: data.totalElements, // Tổng số phần tử
+            });
 
         } catch (err) {
             setError(err.message);
@@ -82,95 +57,105 @@ function OrderListPage() {
         }
     };
 
-    // useEffect
+    // 4. useEffect: Tải dữ liệu khi mount
     useEffect(() => {
-        fetchOrders(currentPage);
-    }, [currentPage]);
+        fetchOrders(pagination.current, pagination.pageSize);
+    }, []); // Chỉ tải 1 lần khi mount
 
-    // Xử lý đổi trang
-    const handleNextPage = () => {
-        if (currentPage < totalPages - 1) {
-            setCurrentPage(currentPage + 1);
-        }
+    // 5. Xử lý khi Table thay đổi (đổi trang, sắp xếp...)
+    const handleTableChange = (newPagination) => {
+        fetchOrders(newPagination.current, newPagination.pageSize);
     };
 
-    const handlePrevPage = () => {
-        if (currentPage > 0) {
-            setCurrentPage(currentPage - 1);
-        }
-    };
+    // 6. Định nghĩa các cột (columns) cho Table
+    const columns = [
+        {
+            title: 'Mã ĐH',
+            dataIndex: 'orderNo',
+            key: 'orderNo',
+        },
+        {
+            title: 'Khách hàng',
+            dataIndex: 'shippingName',
+            key: 'shippingName',
+            render: (text, record) => (
+                <div>
+                    <div>{text}</div>
+                    <small>{record.userEmail}</small>
+                </div>
+            )
+        },
+        {
+            title: 'Ngày đặt',
+            dataIndex: 'createdAt',
+            key: 'createdAt',
+            render: (text) => formatDate(text),
+        },
+        {
+            title: 'Tổng tiền',
+            dataIndex: 'totalAmount',
+            key: 'totalAmount',
+            render: (amount) => formatCurrency(amount),
+        },
+        {
+            title: 'Trạng thái ĐH',
+            dataIndex: 'orderStatus',
+            key: 'orderStatus',
+            render: (status) => {
+                let color = 'geekblue';
+                if (status === 'Delivered') color = 'green';
+                if (status === 'Cancelled') color = 'red';
+                if (status === 'Shipped') color = 'orange';
+                return <Tag color={color}>{status.toUpperCase()}</Tag>;
+            }
+        },
+        {
+            title: 'Trạng thái TT',
+            dataIndex: 'payStatus',
+            key: 'payStatus',
+            render: (status) => (
+                <Tag color={status === 'Paid' ? 'green' : 'volcano'}>
+                    {status.toUpperCase()}
+                </Tag>
+            ),
+        },
+        {
+            title: 'Hành động',
+            key: 'action',
+            render: (text, record) => (
+                <Space size="middle">
+                    <Button
+                        type="primary"
+                        icon={<EyeOutlined />}
+                        onClick={() => navigate(`/admin/orders/${record.id}`)} // Điều hướng
+                    >
+                        Xem
+                    </Button>
+                </Space>
+            ),
+        },
+    ];
 
-    // Render Giao diện
-    if (loading) {
-        return <p>Đang tải danh sách đơn hàng...</p>;
-    }
-
-    if (error) {
-        return <p style={errorStyle}>Lỗi: {error}</p>;
-    }
-
+    // 7. Render Giao diện
     return (
         <div>
-            <h2>Quản lý Đơn hàng</h2>
+            <Space direction="vertical" style={{ width: '100%' }}>
+                <Title level={2}>Quản lý Đơn hàng</Title>
 
-            {/* ========== VÀ SỬ DỤNG NÓ Ở ĐÂY ========== */}
-            <p>Tổng số đơn hàng: {totalElements}</p>
-            {/* ======================================= */}
+                {error && <p style={{color: 'red'}}>Lỗi: {error}</p>}
 
-            <table style={tableStyle}>
-                <thead>
-                    <tr>
-                        <th style={thStyle}>Mã ĐH</th>
-                        <th style={thStyle}>Khách hàng</th>
-                        <th style={thStyle}>Ngày đặt</th>
-                        <th style{...thStyle}>Tổng tiền</th>
-                        <th style={thStyle}>Trạng thái ĐH</th>
-                        <th style={thStyle}>Trạng thái TT</th>
-                        <th style={thStyle}>Hành động</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {orders.map(order => (
-                        <tr key={order.id}>
-                            <td style={thTdStyle}>{order.orderNo}</td>
-                            <td style={thTdStyle}>{order.shippingName} ({order.userEmail})</td>
-                            <td style={thTdStyle}>{formatDate(order.createdAt)}</td>
-                            <td style={thTdStyle}>{formatCurrency(order.totalAmount)}</td>
-                            <td style={thTdStyle}>{order.orderStatus}</td>
-                            <td style={thTdStyle}>{order.payStatus}</td>
-                            <td style={thTdStyle}>
-                                <Link
-                                    to={`/admin/orders/${order.id}`}
-                                    style={{...buttonStyle, backgroundColor: '#17a2b8', color: 'white'}}
-                                >
-                                    Xem
-                                </Link>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-
-            {/* Phân trang */}
-            <div style={paginationStyle}>
-                <button
-                    style={buttonStyle}
-                    onClick={handlePrevPage}
-                    disabled={currentPage === 0}
-                >
-                    Trước
-                </button>
-                <span>
-                    Trang {currentPage + 1} / {totalPages}
-                </span>
-                <button
-                    style={buttonStyle}
-                    onClick={handleNextPage}
-                    disabled={currentPage >= totalPages - 1}
-                >
-                    Sau
-                </button>
-            </div>
+                <Table
+                    columns={columns}
+                    dataSource={orders} // Dữ liệu
+                    rowKey="id" // Khóa chính
+                    pagination={pagination} // Cấu hình phân trang
+                    loading={loading} // Hiệu ứng tải
+                    onChange={handleTableChange} // Xử lý khi đổi trang
+                    bordered
+                    // Cho phép cuộn ngang trên màn hình nhỏ
+                    scroll={{ x: 'max-content' }}
+                />
+            </Space>
         </div>
     );
 }

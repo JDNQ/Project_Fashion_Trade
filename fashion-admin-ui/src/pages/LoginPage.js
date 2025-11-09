@@ -1,88 +1,65 @@
 import React, { useState } from 'react';
-// import AuthService from '../services/AuthService'; // (Không cần gọi trực tiếp nữa)
-import { useAuth } from '../hooks/useAuth'; // <-- 1. Import hook
+import { Link } from 'react-router-dom'; // 1. Import Link
+import { useAuth } from '../hooks/useAuth';
+import { Form, Input, Button, Card, Typography, notification } from 'antd';
+import { UserOutlined, LockOutlined } from '@ant-design/icons';
 
-// (styles vẫn như cũ)
-const loginStyles = {
-    container: { width: '300px', margin: '100px auto', padding: '20px', border: '1px solid #ccc', borderRadius: '5px' },
-    formGroup: { marginBottom: '15px' },
-    label: { display: 'block', marginBottom: '5px' },
-    input: { width: '100%', padding: '8px', boxSizing: 'border-box' },
-    button: { width: '100%', padding: '10px', backgroundColor: '#007bff', color: 'white', border: 'none', cursor: 'pointer' },
-    error: { color: 'red', marginTop: '10px' }
-};
+const { Title } = Typography;
 
 function LoginPage() {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const { login } = useAuth();
 
-    const { login } = useAuth(); // <-- 2. Lấy hàm login từ Context
-
-    const handleSubmit = async (event) => {
-        event.preventDefault();
-
-        if (!email || !password) {
-            setError('Vui lòng nhập cả email và mật khẩu.');
-            return;
-        }
-
-        setError('');
+    const onFinish = async (values) => {
         setLoading(true);
-
         try {
-            // 3. Gọi hàm login từ Context
-            await login(email, password);
-
-            setLoading(false);
-
-            // 4. Xử lý thành công
-            alert('Đăng nhập thành công!');
-            // (Trang sẽ tự động cập nhật vì state 'isAuthenticated' đã thay đổi)
-
+            await login(values.email, values.password);
         } catch (err) {
+            notification.error({
+                message: 'Đăng nhập thất bại',
+                description: err.message || 'Sai email hoặc mật khẩu.',
+            });
             setLoading(false);
-            setError('Đăng nhập thất bại: ' + err.message);
         }
     };
 
     return (
-        <div style={loginStyles.container}>
-            <h2>Đăng nhập Admin</h2>
-            <form onSubmit={handleSubmit}>
-                {/* ... (Phần JSX của form không thay đổi) ... */}
-                <div style={loginStyles.formGroup}>
-                    <label style={loginStyles.label}>Email:</label>
-                    <input
-                        type="email"
-                        style={loginStyles.input}
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        disabled={loading}
-                    />
-                </div>
-                <div style={loginStyles.formGroup}>
-                    <label style={loginStyles.label}>Password:</label>
-                    <input
-                        type="password"
-                        style={loginStyles.input}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        disabled={loading}
-                    />
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f0f2f5' }}>
+            <Card style={{ width: 400 }}>
+                <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                    <Title level={2}>Đăng nhập Admin</Title>
                 </div>
 
-                {error && <p style={loginStyles.error}>{error}</p>}
-
-                <button
-                    type="submit"
-                    style={loginStyles.button}
-                    disabled={loading}
+                <Form
+                    name="admin_login"
+                    onFinish={onFinish}
                 >
-                    {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
-                </button>
-            </form>
+                    <Form.Item
+                        name="email"
+                        rules={[{ required: true, message: 'Vui lòng nhập Email!' }, { type: 'email', message: 'Email không hợp lệ!' }]}
+                    >
+                        <Input prefix={<UserOutlined />} placeholder="Email" />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="password"
+                        rules={[{ required: true, message: 'Vui lòng nhập Mật khẩu!' }]}
+                    >
+                        <Input.Password prefix={<LockOutlined />} placeholder="Password" />
+                    </Form.Item>
+
+                    <Form.Item>
+                        <Button type="primary" htmlType="submit" loading={loading} style={{ width: '100%' }}>
+                            Đăng nhập
+                        </Button>
+                    </Form.Item>
+
+                    {/* 2. THÊM LIÊN KẾT ĐĂNG KÝ */}
+                    <Form.Item style={{ textAlign: 'center' }}>
+                        <Link to="/register">Chưa có tài khoản? Đăng ký ngay</Link>
+                    </Form.Item>
+                </Form>
+            </Card>
         </div>
     );
 }
