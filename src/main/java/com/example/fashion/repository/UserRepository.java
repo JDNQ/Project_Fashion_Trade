@@ -14,4 +14,4 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // 2. THÊM HÀM MỚI (Đếm số user theo vai trò)
     long countByRolesContains(Role role);
-}
+}   

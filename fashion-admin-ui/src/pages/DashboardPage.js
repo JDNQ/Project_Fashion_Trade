@@ -1,17 +1,19 @@
-import React, { useState, useEffect } from 'react'; // 1. Import hooks
-import { Typography, Card, Row, Col, Statistic, Spin } from 'antd'; // 2. Import Spin
+import React, { useState, useEffect } from 'react';
+import { Typography, Card, Row, Col, Statistic, Spin } from 'antd';
 import { ShoppingCartOutlined, UserOutlined, DollarCircleOutlined } from '@ant-design/icons';
-import DashboardService from '../services/DashboardService  '; // 3. Import service
+// ========== SỬA LỖI Ở DÒNG NÀY ==========
+import DashboardService from '../services/DashboardService'; // Xóa 1 dấu chấm, chỉ còn ../
+// ===================================
 
 const { Title, Paragraph } = Typography;
 
 function DashboardPage() {
-    // 4. Tạo state để lưu dữ liệu, loading, error
+    // State để lưu dữ liệu, loading, error
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // 5. useEffect để gọi API khi trang được tải
+    // useEffect để gọi API khi trang được tải
     useEffect(() => {
         const fetchStats = async () => {
             try {
@@ -28,17 +30,17 @@ function DashboardPage() {
         fetchStats();
     }, []); // Mảng rỗng [] = chỉ chạy 1 lần
 
-    // 6. Xử lý trạng thái Loading
+    // Xử lý trạng thái Loading
     if (loading) {
-        return <Spin tip="Đang tải số liệu..." size="large" />;
+        return <Spin tip="Đang tải số liệu..." size="large" fullscreen />;
     }
 
-    // 7. Xử lý trạng thái Lỗi
+    // Xử lý trạng thái Lỗi
     if (error) {
         return <p style={{ color: 'red' }}>Lỗi: {error}</p>;
     }
 
-    // 8. Render khi có dữ liệu
+    // Render khi có dữ liệu
     return (
         <div>
             <Title level={2}>Chào mừng bạn đến với Dashboard</Title>
@@ -49,7 +51,7 @@ function DashboardPage() {
                     <Card>
                         <Statistic
                             title="Tổng Đơn hàng"
-                            value={stats ? stats.totalOrders : 0} // <-- Dữ liệu thực tế
+                            value={stats ? stats.totalOrders : 0} // Dữ liệu thực tế
                             prefix={<ShoppingCartOutlined />}
                             valueStyle={{ color: '#3f8600' }}
                         />
@@ -59,7 +61,7 @@ function DashboardPage() {
                     <Card>
                         <Statistic
                             title="Tổng Doanh thu (Đã giao)"
-                            value={stats ? stats.totalRevenue : 0} // <-- Dữ liệu thực tế
+                            value={stats ? stats.totalRevenue : 0} // Dữ liệu thực tế
                             prefix={<DollarCircleOutlined />}
                             suffix="VND"
                             precision={0} // Không hiển thị số lẻ
@@ -71,7 +73,7 @@ function DashboardPage() {
                     <Card>
                         <Statistic
                             title="Tổng Khách hàng"
-                            value={stats ? stats.totalCustomers : 0} // <-- Dữ liệu thực tế
+                            value={stats ? stats.totalCustomers : 0} // Dữ liệu thực tế
                             prefix={<UserOutlined />}
                             valueStyle={{ color: '#1890ff' }}
                         />
